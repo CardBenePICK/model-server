@@ -15,7 +15,7 @@ from pycaret.classification import load_model, predict_model
 import uvicorn
 
 # Database (SQLAlchemy)
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, DateTime, Text
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, DateTime, Text, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
@@ -227,5 +227,17 @@ def save_feedback(feedback: FeedbackRequest, db: Session = Depends(get_db)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"DB 저장 중 오류 발생: {str(e)}")
 
+@app.get("/health", tags=["Operations"])
+def health_check(db: Session = Depends(get_db)):
+    """
+    서버 상태 및 DB 연결 상태를 점검합니다. (로드밸런서/K8s용)
+    """
+    try:
+        # DB에 간단한 쿼리 실행 (SELECT 1)
+        db.execute(text("SELECT 1"))
+        return {"status": "healthy", "database": "connected", "timestamp": datetime.now()}
+    except Exception as e:
+        return {"status": "unhealthy", "database": str(e), "timestamp": datetime.now()}
+    
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=9000, reload=True)

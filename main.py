@@ -1,15 +1,20 @@
 import pandas as pd
+import uuid
+from typing import List
+
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+# PyCaret
 from pycaret.classification import load_model, predict_model
 import uvicorn
 
 # 1. FastAPI 앱 초기화
 app = FastAPI(
     title="Customer Clustering API",
-    description="설문 응답(범주형 데이터)을 기반으로 고객 클러스터를 분류하는 API",
-    version="1.2"
+    description="설문 응답(범주형 데이터)을 기반으로 고객 클러스터를 분류하는 API (확률 순위 포함)",
+    version="1.3"
 )
 
 app.add_middleware(
@@ -40,36 +45,73 @@ class CustomerProfile(BaseModel):
     Q_EDU: str = Field(..., example="No", description="교육 소비 여부 (Yes, No)")
     Q_HEALTH: str = Field(..., example="No", description="건강/병원 소비 여부 (Yes, No)")
 
+# 순위 정보 스키마
+class ClusterRanking(BaseModel):
+    cluster: int
+    probability: float
+
+# 최종 응답 스키마
+class PredictionResponse(BaseModel):
+    status: str
+    request_id: str
+    predicted_cluster: int
+    confidence_score: float
+    ranking: List[ClusterRanking] # 1위부터 순서대로 담길 리스트
+    input_check: dict
+
+
 # 4. 예측 엔드포인트
-@app.post("/predict", tags=["Prediction"])
+@app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
 def predict_cluster(profile: CustomerProfile):
     try:
-        # 1. 입력 데이터를 딕셔너리로 변환
-        input_data = profile.dict()
+        # 1. 고유 ID 생성 (요청 추적용)
+        request_id = str(uuid.uuid4())
         
-        # 2. 데이터프레임 변환
-        # PyCaret 모델은 DataFrame 입력을 기대합니다.
+        # 2. 입력 데이터 변환
+        input_data = profile.model_dump()
         data_df = pd.DataFrame([input_data])
         
-        # 3. 모델 예측
-        # PyCaret 파이프라인이 내부적으로 Encoding(One-Hot 등)을 처리합니다.
-        predictions = predict_model(model, data=data_df)
+        # 3. 모델 예측 (raw_score=True 옵션 추가)
+        predictions = predict_model(model, data=data_df, raw_score=True)
         
-        # 4. 결과 추출
-        # PyCaret 3.x 결과 컬럼: 'prediction_label', 'prediction_score'
-        predicted_cluster = predictions['prediction_label'].iloc[0]
-        score = predictions['prediction_score'].iloc[0]
+        # 4. 결과 추출 (1순위 예측값)
+        predicted_cluster = int(predictions['prediction_label'].iloc[0])
+        confidence_score = float(predictions['prediction_score'].iloc[0])
         
-        # 5. 결과 반환
+        # 5. [핵심] 확률 순위 리스트 생성 로직
+        ranking_list = []
+        scores = {}
+        
+        # 데이터프레임 컬럼 중 'Score_'로 시작하는 것만 찾습니다.
+        for col in predictions.columns:
+            if col.startswith("Score_"):
+                try:
+                    # 컬럼명 예시: Score_0 -> 0번 클러스터
+                    cluster_num = int(col.split('_')[1])
+                    prob = float(predictions[col].iloc[0])
+                    scores[cluster_num] = prob
+                except:
+                    continue
+        
+        # 확률이 높은 순서대로 정렬 (내림차순)
+        # sorted_scores는 [(클러스터번호, 확률), ...] 형태의 리스트가 됨
+        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        
+        # 응답 포맷에 맞게 변환
+        for c_num, prob in sorted_scores:
+            ranking_list.append(ClusterRanking(cluster=c_num, probability=round(prob, 4)))
+            
+        # 6. 결과 반환
         return {
             "status": "success",
-            "predicted_cluster": int(predicted_cluster),
-            "confidence_score": float(score),
-            "input_check": input_data # 디버깅용: 입력값 확인
+            "request_id": request_id,
+            "predicted_cluster": predicted_cluster,
+            "confidence_score": confidence_score,
+            "ranking": ranking_list,
+            "input_check": input_data
         }
 
     except Exception as e:
-        # 에러 발생 시 상세 메시지 반환
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

@@ -3,3 +3,7 @@ uvicorn
 pandas
 pycaret==3.3.2
 xgboost
+sqlalchemy
+pymysql
+python-dotenv
+cryptography

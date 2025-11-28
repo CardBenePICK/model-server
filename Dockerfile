@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 5. Copy application files
 COPY . .
 
-# 6. Expose the port the app runs on
-EXPOSE 8000
+# 5. Expose the port the app runs on
+EXPOSE 9000
 
-# 7. Command to run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 6. Command to run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]

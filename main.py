@@ -1,6 +1,7 @@
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware
 from pycaret.classification import load_model, predict_model
 import uvicorn
 
@@ -9,6 +10,14 @@ app = FastAPI(
     title="Customer Clustering API",
     description="설문 응답(범주형 데이터)을 기반으로 고객 클러스터를 분류하는 API",
     version="1.2"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],        # 허용할 프론트엔드 주소들
+    allow_credentials=True,     # 쿠키/인증정보 허용 여부
+    allow_methods=["*"],        # 허용할 HTTP Method (GET, POST, OPTIONS 등 전체 허용)
+    allow_headers=["*"],        # 허용할 헤더 (Content-Type 등 전체 허용)
 )
 
 # 2. 모델 로드

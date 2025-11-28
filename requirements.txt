@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+pandas
+pycaret==3.3.2
+xgboost

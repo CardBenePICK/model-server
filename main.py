@@ -79,7 +79,7 @@ def get_db():
     finally:
         db.close()
 
-app = FastAPI(title="Customer Clustering API", version="3.3") 
+app = FastAPI(title="Customer Clustering API", version="3.3", root_path="/model") 
 
 app.add_middleware(
     CORSMiddleware,

@@ -100,8 +100,8 @@ except:
     print("⚠️ Cold Start Model Load Failed")
 
 try:
-    if os.path.exists('mydata_automl_all_stats_champion.pkl'):
-        model_mydata = load_model('mydata_automl_all_stats_champion')
+    if os.path.exists('mydata_xgboost_tuned_champion.pkl'):
+        model_mydata = load_model('mydata_xgboost_tuned_champion')
         print("✅ MyData Model Loaded")
     else:
         model_mydata = None
